@@ -66,7 +66,6 @@ class Yolo(Detector):
     def _show_image(self, image, detections):
         try:
             thickness = max((image.shape[0] + image.shape[1]) // 1000, 2)
-            # print(thickness)
             hsv_tuples = [(x / len(self.class_names), 1., 1.) for x in range(len(self.class_names))]
             colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
             colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
@@ -74,7 +73,7 @@ class Yolo(Detector):
             np.random.shuffle(colors)  # Shuffle colors to decorrelate adjacent classes.
             np.random.seed(None)  # Reset seed to default.
             for box, score, label in detections:
-                print(label, '    ', score)
+                print(label, ' ' * 5, score)
                 left_top = tuple(box[:2][::-1])
                 right_bottom = tuple(box[2:][::-1])
                 image = cv2.rectangle(image, left_top, right_bottom, colors[int(label)], thickness)

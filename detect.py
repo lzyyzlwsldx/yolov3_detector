@@ -1,6 +1,9 @@
 import os
+from absl import (app, flags)
 from models.detector import Yolo, Csresnext
 
+FLAGS = flags.FLAGS
+flags.DEFINE_string('image_dir', None, 'The image dir for detecting.')
 USE_CPU = False
 
 if USE_CPU:
@@ -21,15 +24,13 @@ def model_init():
     return Csresnext(model_cfg)
 
 
-def main():
+def main(_args):
     detector = model_init()
-    img_dir = '/Users/lizhengyang/Desktop/record/'
-
-    names = [n for n in os.listdir(img_dir) if n[-3:] in ['jpg', 'peg', 'bmp', 'png']]
+    names = [n for n in os.listdir(FLAGS.image_dir) if n[-3:] in ['jpg', 'peg', 'bmp', 'png']]
 
     for n in names:
-        detections = detector.perform_detect(img_dir + n, True, True)
+        detections = detector.perform_detect(FLAGS.image_dir + n, True, True)
 
 
 if __name__ == '__main__':
-    main()
+    app.run(main)
