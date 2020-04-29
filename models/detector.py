@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import colorsys
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 from models.post_process import yolo_eval
 from models.data_stream import get_model_input, get_anchors, get_classes
@@ -35,13 +36,10 @@ class Yolo(Detector):
                 len(self.class_names) + 5), 'Mismatched between model and given anchors or classes'
 
     @get_time
+    @tf.function
     def _detect(self, inputs):
         outputs = self.model(inputs)
-        boxes, scores, classes = yolo_eval(outputs, self.anchors, len(self.class_names),
-                                           max_boxes=20)
-        boxes, scores, classes = boxes.numpy(), scores.numpy(), classes.numpy()
-        detections = [[list(map(lambda x: int(round(x)), boxes[i])), float(scores[i]), int(classes[i])] for i in
-                      range(len(scores))]
+        detections = yolo_eval(outputs, self.anchors, len(self.class_names), max_boxes=20)
         return detections
 
     def perform_detect(self, image_path, show_image=False, verbose=False):
@@ -54,6 +52,9 @@ class Yolo(Detector):
             print(e)
             return [], ''
         detections, duration = self._detect(image_data)
+        boxes, scores, classes = map(lambda x: x.numpy(), detections)
+        detections = [[list(map(lambda x: int(round(x)), boxes[i])), float(scores[i]), int(classes[i])] for i in
+                      range(len(scores))]
         if verbose:
             print('Time of detecting is ', duration)
             print('Detected {} boxes for {}'.format(len(detections), 'img'))
@@ -91,11 +92,9 @@ class Yolo(Detector):
 
 class Csresnext(Yolo):
     @get_time
+    @tf.function
     def _detect(self, inputs):
         outputs = self.model(inputs)[::-1]
-        boxes, scores, classes = yolo_eval(outputs, self.anchors, len(self.class_names),
-                                           max_boxes=20)
-        boxes, scores, classes = boxes.numpy(), scores.numpy(), classes.numpy()
-        detections = [[list(map(lambda x: int(round(x)), boxes[i])), float(scores[i]), int(classes[i])] for i in
-                      range(len(scores))]
+        detections = yolo_eval(outputs, self.anchors, len(self.class_names),
+                               max_boxes=20)
         return detections
