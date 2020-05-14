@@ -3,16 +3,35 @@ import configparser
 import io
 import os
 from collections import defaultdict
-
+import math
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import (Conv2D, Input, ZeroPadding2D, Add, UpSampling2D, MaxPooling2D,
-                                     Concatenate,
+                                     Concatenate, Activation,
                                      LeakyReLU, BatchNormalization)
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.utils import plot_model as plot
+from tensorflow.keras.utils import get_custom_objects
 
+
+def swish_activation(x):
+    return K.sigmoid(x) * x
+
+
+def mish(x):
+    return x * K.tanh(K.switch(K.greater(x, 20), x, K.switch(K.less(x, -20), K.exp(x), K.log(K.exp(x) + 1))))
+
+    # if x > 20:
+    #     return x * K.tanh(x)
+    # elif x < -20:
+    #     return x * K.tanh(K.exp(x))
+    # else:
+    #     return x * K.tanh(K.log(1 + K.exp(x)))
+
+
+get_custom_objects().update({'mish': Activation(mish)})
 parser = argparse.ArgumentParser(description='Darknet To Keras Converter.')
 parser.add_argument('config_path', help='Path to Darknet cfg file.')
 parser.add_argument('weights_path', help='Path to Darknet weights file.')
@@ -142,7 +161,7 @@ def _main(args):
 
             # Handle activation.
             act_fn = None
-            if activation == 'leaky':
+            if activation == 'leaky' or 'mish':
                 pass  # Add advanced activation later.
             elif activation != 'linear':
                 raise ValueError(
@@ -173,6 +192,11 @@ def _main(args):
                 act_layer = LeakyReLU(alpha=0.1)(prev_layer)
                 prev_layer = act_layer
                 all_layers.append(act_layer)
+            elif activation == 'mish':
+                act_layer = Activation(mish)(prev_layer)
+                prev_layer = act_layer
+                all_layers.append(act_layer)
+
 
         elif section.startswith('route'):
             ids = [int(i) for i in cfg_parser[section]['layers'].split(',')]

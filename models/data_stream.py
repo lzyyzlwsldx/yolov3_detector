@@ -1,3 +1,4 @@
+from configparser import ConfigParser
 import numpy as np
 import cv2
 
@@ -23,6 +24,13 @@ def letterbox_image(image, size):
     new_image = np.ones(size, dtype=np.uint8) * 128
     new_image[(dh - nh) // 2:(dh + nh) // 2, (dw - nw) // 2:(dw + nw) // 2] = image
     return new_image
+
+
+def get_config(cfg_path):
+    cp = ConfigParser()
+    cp.read(cfg_path)
+    cfg = dict(cp.items('model_cfg'))
+    return cfg
 
 
 def get_anchors(anchors_path):

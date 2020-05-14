@@ -1,10 +1,9 @@
 import tensorflow as tf
 
 
-def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
+def yolo_head(feats, anchors, scale_x_y, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""
     num_anchors = len(anchors)
-
     # Reshape to (batch, height, width, num_anchors, box_params.
     anchors_tensor = tf.cast(tf.reshape(anchors, [1, 1, 1, num_anchors, 2]), feats.dtype)
     grid_shape = tf.shape(feats)[1:3]  # height, width
@@ -15,7 +14,7 @@ def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     grid = tf.cast(grid, feats.dtype)
     feats = tf.reshape(feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
     # Adjust preditions to each spatial grid point and anchor size.
-    box_xy = (tf.sigmoid(feats[..., :2]) + grid) / tf.cast(grid_shape[::-1], feats.dtype)
+    box_xy = (tf.sigmoid(feats[..., :2]) * scale_x_y + grid) / tf.cast(grid_shape[::-1], feats.dtype)
     box_wh = tf.exp(feats[..., 2:4]) * anchors_tensor / tf.cast(input_shape[::-1], feats.dtype)
     box_confidence = tf.sigmoid(feats[..., 4:5])
     box_class_probs = tf.sigmoid(feats[..., 5:])
@@ -39,9 +38,10 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape):
     return boxes
 
 
-def yolo_boxes_and_scores(one_layer_features, anchors, num_classes, input_shape):
+def yolo_boxes_and_scores(one_layer_features, anchors, scale_x_y, num_classes, input_shape):
     '''Process Conv layer output'''
-    box_xy, box_wh, box_confidence, box_class_probs = yolo_head(one_layer_features, anchors, num_classes, input_shape)
+    box_xy, box_wh, box_confidence, box_class_probs = yolo_head(one_layer_features, anchors, scale_x_y, num_classes,
+                                                                input_shape)
     boxes = yolo_correct_boxes(box_xy, box_wh, input_shape)
     boxes = tf.reshape(boxes, [-1, 4])
     box_scores = box_confidence * box_class_probs
@@ -49,7 +49,7 @@ def yolo_boxes_and_scores(one_layer_features, anchors, num_classes, input_shape)
     return boxes, box_scores
 
 
-# @tf.function
+@tf.function
 def yolo_eval(yolo_outputs,
               anchors,
               num_classes,
@@ -69,6 +69,7 @@ def yolo_eval(yolo_outputs,
     num_layers = len(yolo_outputs)
     # 根据config里的顺序
     anchor_mask = [[6, 7, 8], [3, 4, 5], [0, 1, 2]]
+    scale_x_y_mask = [1.05, 1.1, 1.2]
     # 获取原始输入形状
     input_shape = tf.shape(yolo_outputs[0])[1:3] * 32
     boxes, box_scores = [], []
@@ -76,6 +77,7 @@ def yolo_eval(yolo_outputs,
         # read anchors of each feats in anchors.txt.
         _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[layer],
                                                     tf.gather(anchors, anchor_mask[layer]),
+                                                    scale_x_y_mask[layer],
                                                     num_classes,
                                                     input_shape)
         boxes.append(_boxes)
